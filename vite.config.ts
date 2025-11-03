@@ -14,5 +14,10 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    build: {
+  assetsDir: './',
+  outDir: 'dist',
+  emptyOutDir: true,
+}
   },
 }));
