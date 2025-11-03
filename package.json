@@ -4,7 +4,6 @@
   "version": "0.0.0",
   "type": "module",
   "homepage": "https://santhiya-2000.github.io/quiz-master-genie-45",
-
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,7 +11,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build",
-   "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -53,6 +52,7 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
+    "pdf-parse": "^2.4.5",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -86,5 +86,4 @@
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19"
   }
-  
 }

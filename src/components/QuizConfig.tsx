@@ -8,6 +8,14 @@ import { ArrowLeft, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { QuestionType, Difficulty, Question } from "@/pages/Index";
 
+// Dynamic import for pdf-parse
+const getPdfText = async (data: ArrayBuffer | Uint8Array) => {
+  const pdfModule = await import('pdf-parse');
+  // @ts-ignore - The module might have different export structure
+  const pdf = pdfModule.default || pdfModule;
+  return pdf(data);
+};
+
 interface QuizConfigProps {
   questionType: QuestionType;
   difficulty: Difficulty;
@@ -41,29 +49,22 @@ export const QuizConfig = ({
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
     try {
-      // Simple text extraction for PDF files (for more robust extraction, consider using pdf-parse)
-      if (file.type === 'application/pdf') {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const response = await fetch('https://api.pdf.co/v1/pdf/convert/to/text', {
-          method: 'POST',
-          headers: {
-            'x-api-key': import.meta.env.VITE_PDF_CO_API_KEY || ''
-          },
-          body: formData
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to extract text from PDF');
-        }
-
-        const data = await response.json();
-        return data.content || '';
+      console.log('Starting PDF extraction...');
+      
+      // Convert file to ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Extract text using pdf-parse
+      const pdfData = await getPdfText(uint8Array);
+      const extractedText = pdfData.text.trim();
+      
+      if (!extractedText) {
+        throw new Error('The PDF appears to be empty or contains no extractable text.');
       }
       
-      // For non-PDF files, use text() method
-      return await file.text();
+      console.log('Successfully extracted text from PDF');
+      return extractedText;
     } catch (error) {
       console.error('Error extracting text from file:', error);
       throw new Error('Failed to process the uploaded file. Please try another file.');
@@ -74,23 +75,23 @@ export const QuizConfig = ({
     setIsGenerating(true);
     
     try {
+      console.log('Starting quiz generation...');
+      
       // Check if content is empty
       if (!content) {
-        throw new Error('Please provide some content or upload a file to generate a quiz.');
+        throw new Error('Please provide some content to generate a quiz.');
       }
 
-      let processedContent = content;
+      const processedContent = content;
+      console.log('Processing content, length:', processedContent.length);
       
-      // If content is a File object (from file upload), extract text
-      if (content instanceof File) {
-        processedContent = await extractTextFromPdf(content);
-        
-        // Check if extracted content is empty
-        if (!processedContent.trim()) {
-          throw new Error('The uploaded file appears to be empty or could not be read.');
-        }
+      if (!processedContent.trim()) {
+        throw new Error('The provided content appears to be empty or contains only whitespace.');
       }
 
+      // Log a preview of the content (first 200 chars)
+      console.log('Content preview:', String(processedContent).substring(0, 200) + '...');
+      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-quiz`,
         {
@@ -100,7 +101,7 @@ export const QuizConfig = ({
             "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
-            content: processedContent,
+            content: String(processedContent),
             questionType,
             difficulty,
             questionCount,
@@ -111,6 +112,7 @@ export const QuizConfig = ({
       const data = await response.json();
       
       if (!response.ok) {
+        console.error('API Error:', data);
         throw new Error(data.error || 'Failed to generate quiz. Please try again.');
       }
 
@@ -128,7 +130,7 @@ export const QuizConfig = ({
       
       onSubmit();
     } catch (error) {
-      console.error('Error generating quiz:', error);
+      console.error('Error in handleGenerate:', error);
       
       let errorMessage = 'An unexpected error occurred. Please try again later.';
       
