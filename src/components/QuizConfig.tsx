@@ -39,9 +39,58 @@ export const QuizConfig = ({
   const questionTypes: QuestionType[] = ["MCQ", "True/False", "One Word", "Brief", "Long Answer"];
   const difficulties: Difficulty[] = ["Easy", "Medium", "Hard"];
 
+  const extractTextFromPdf = async (file: File): Promise<string> => {
+    try {
+      // Simple text extraction for PDF files (for more robust extraction, consider using pdf-parse)
+      if (file.type === 'application/pdf') {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('https://api.pdf.co/v1/pdf/convert/to/text', {
+          method: 'POST',
+          headers: {
+            'x-api-key': import.meta.env.VITE_PDF_CO_API_KEY || ''
+          },
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to extract text from PDF');
+        }
+
+        const data = await response.json();
+        return data.content || '';
+      }
+      
+      // For non-PDF files, use text() method
+      return await file.text();
+    } catch (error) {
+      console.error('Error extracting text from file:', error);
+      throw new Error('Failed to process the uploaded file. Please try another file.');
+    }
+  };
+
   const handleGenerate = async () => {
     setIsGenerating(true);
+    
     try {
+      // Check if content is empty
+      if (!content) {
+        throw new Error('Please provide some content or upload a file to generate a quiz.');
+      }
+
+      let processedContent = content;
+      
+      // If content is a File object (from file upload), extract text
+      if (content instanceof File) {
+        processedContent = await extractTextFromPdf(content);
+        
+        // Check if extracted content is empty
+        if (!processedContent.trim()) {
+          throw new Error('The uploaded file appears to be empty or could not be read.');
+        }
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-quiz`,
         {
@@ -51,10 +100,10 @@ export const QuizConfig = ({
             "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
-            content,
+            content: processedContent,
             questionType,
             difficulty,
-            count: questionCount,
+            questionCount,
           }),
         }
       );
@@ -70,11 +119,14 @@ export const QuizConfig = ({
       }
 
       onQuestionsGenerated(data.questions || data);
-      onSubmit();
+      
       toast({
         title: "Quiz Generated!",
-        description: `${data.questions.length} questions created successfully`,
+        description: `Successfully created ${data.questions?.length || data.length} questions.`,
+        variant: "default",
       });
+      
+      onSubmit();
     } catch (error) {
       console.error('Error generating quiz:', error);
       
