@@ -48,6 +48,7 @@ export const QuizConfig = ({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
             content,
@@ -58,25 +59,38 @@ export const QuizConfig = ({
         }
       );
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to generate quiz");
+        throw new Error(data.error || 'Failed to generate quiz. Please try again.');
       }
 
-      const data = await response.json();
-      onQuestionsGenerated(data.questions);
-      
+      if (!data.questions && !Array.isArray(data)) {
+        throw new Error('Invalid response format from the server');
+      }
+
+      onQuestionsGenerated(data.questions || data);
+      onSubmit();
       toast({
         title: "Quiz Generated!",
         description: `${data.questions.length} questions created successfully`,
       });
-      
-      onSubmit();
     } catch (error) {
+      console.error('Error generating quiz:', error);
+      
+      let errorMessage = 'An unexpected error occurred. Please try again later.';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
       toast({
-        title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Please try again",
+        title: "Error Generating Quiz",
+        description: errorMessage,
         variant: "destructive",
+        duration: 5000,
       });
     } finally {
       setIsGenerating(false);
